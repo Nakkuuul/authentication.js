@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import jwt from "jsonwebtoken";
 import config from '../src/config/config.js';
 
+// Register
 export async function register(req, res){
     const { username, email, password } = req.body;
 
@@ -42,5 +43,32 @@ export async function register(req, res){
             email: user.email,
         },
         token: token
+    });
+};
+
+
+// Get Me
+
+export async function getMe(req, res) {
+    const token = req.headers.authorization?.split(" ")[ 1 ];
+
+    if(!token) {
+        return res.status(401).json({
+            success: false,
+            message: 'Token not found'
+        });
+    };
+
+    const decodedToken = jwt.verify(token, config.JWT_SECRET);
+
+    const userData = await userModel.findById(decodedToken.id);
+
+    return res.status(200).json({
+        success: true,
+        message: 'User Fetched Seccessfully',
+        data: {
+            username: userData.username,
+            email: userData.email
+        }
     });
 };
