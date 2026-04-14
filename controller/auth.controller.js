@@ -29,10 +29,16 @@ export async function register(req, res){
         password: hashedPassword
 });
 
-    const token = jwt.sign({
+    const accessToken = jwt.sign({
         id: user._id
-    }, config.JWT_SECRET,{
-        expiresIn: "1d"
+    }, config.JWT_ACCESS_TOKEN,{
+        expiresIn: "15m"
+    });
+
+    const refreshToken = jwt.sign({
+        id: user._id
+    }, config.JWT_REFRESH_TOKEN,{
+        expiresIn: "7d"
     });
 
     res.status(201).json({
@@ -42,7 +48,8 @@ export async function register(req, res){
             username: user.username,
             email: user.email,
         },
-        token: token
+        accessToken: accessToken,
+        refreshToken: refreshToken
     });
 };
 
@@ -50,16 +57,16 @@ export async function register(req, res){
 // Get Me
 
 export async function getMe(req, res) {
-    const token = req.headers.authorization?.split(" ")[ 1 ];
+    const accessToken = req.headers.authorization?.split(" ")[ 1 ];
 
-    if(!token) {
+    if (!accessToken) {
         return res.status(401).json({
             success: false,
             message: 'Token not found'
         });
     };
 
-    const decodedToken = jwt.verify(token, config.JWT_SECRET);
+    const decodedToken = jwt.verify(accessToken, config.JWT_ACCESS_TOKEN);
 
     const userData = await userModel.findById(decodedToken.id);
 
@@ -71,4 +78,50 @@ export async function getMe(req, res) {
             email: userData.email
         }
     });
+};
+
+// Access Token is Short Lived Token
+// Refresh Token is Long Lived Token
+
+// Get Access Token
+
+export async function refreshAccessToken(req, res) {
+    try{
+        const incomingRefreshToken = req.headers.authorization?.split(" ")[1];
+
+        if (!incomingRefreshToken) {
+            return res.status(401).json({
+                success: false,
+                message: 'Token not found'
+            });
+        };
+
+        const decodedToken = jwt.verify(incomingRefreshToken, config.JWT_REFRESH_TOKEN);
+        const userData = await userModel.findById(decodedToken.id);
+
+        if (!userData) {
+            return res.status(404).json({
+                success: false,
+                message: 'User Not Found'
+            });
+        };
+
+        const accessToken = jwt.sign({
+            id: decodedToken.id
+        }, config.JWT_ACCESS_TOKEN,{
+            expiresIn: "15m"
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Access Token Generated',
+            accessToken: accessToken
+        });
+    } catch(error) {
+        return res.status(400).json({
+            success: false,
+            message: 'Internal Server Error',
+            error: error.message
+        });
+    };
 };
