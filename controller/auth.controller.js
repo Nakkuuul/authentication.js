@@ -1,147 +1,161 @@
-    import userModel from '../models/user.model.js'
-    import crypto from 'crypto';
-    import jwt from "jsonwebtoken";
-    import config from '../src/config/env.js';
+import userModel from "../models/user.model.js";
+import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import config from "../src/config/env.js";
 
-    // Register
-    export async function register(req, res){
-        const { username, email, password } = req.body;
+// Register
+export async function register(req, res) {
+  const { username, email, password } = req.body;
 
-        const isAlreadyRegistered = await userModel.findOne({
-            $or: [
-                { username },
-                { email }
-            ]
-        });
+  const isAlreadyRegistered = await userModel.findOne({
+    $or: [{ username }, { email }],
+  });
 
-        if (isAlreadyRegistered) {
-            return res.status(409).json({
-                success: false,
-                message: 'Username or Email already exist'
-            });
-        };
-
-        const hashedPassword = crypto.createHash("sha256").update(password).digest("hex");
-
-        const user = await userModel.create({
-            username,
-            email,
-            password: hashedPassword
+  if (isAlreadyRegistered) {
+    return res.status(409).json({
+      success: false,
+      message: "Username or Email already exist",
     });
+  }
 
-        const accessToken = jwt.sign({
-            id: user._id
-        }, config.JWT_ACCESS_TOKEN,{
-            expiresIn: "15m"
-        });
+  const hashedPassword = crypto
+    .createHash("sha256")
+    .update(password)
+    .digest("hex");
 
-        const refreshToken = jwt.sign({
-            id: user._id
-        }, config.JWT_REFRESH_TOKEN,{
-            expiresIn: "7d"
-        });
+  const user = await userModel.create({
+    username,
+    email,
+    password: hashedPassword,
+  });
 
-        res.cookie("refreshToken", refreshToken, {
-            httpOnly: true,
-            secure: true,
-            sameSite: "strict"
-        });
-        
-        res.status(201).json({
-            success: true,
-            message: 'User Registered Seccessfully',
-            user: {
-                username: user.username,
-                email: user.email,
-            },
-            accessToken: accessToken
-        });
-    };
+  const accessToken = jwt.sign(
+    {
+      id: user._id,
+    },
+    config.JWT_ACCESS_TOKEN,
+    {
+      expiresIn: "15m",
+    },
+  );
 
+  const refreshToken = jwt.sign(
+    {
+      id: user._id,
+    },
+    config.JWT_REFRESH_TOKEN,
+    {
+      expiresIn: "7d",
+    },
+  );
 
-    // Get Me
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "strict",
+  });
 
-    export async function getMe(req, res) {
-        try{
-            const accessToken = req.headers.authorization?.split(" ")[ 1 ];
+  res.status(201).json({
+    success: true,
+    message: "User Registered Seccessfully",
+    user: {
+      username: user.username,
+      email: user.email,
+    },
+    accessToken: accessToken,
+  });
+}
 
-            if (!accessToken) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Token not found'
-                });
-            };
+// Get Me
 
-            const decodedToken = jwt.verify(accessToken, config.JWT_ACCESS_TOKEN);
+export async function getMe(req, res) {
+  try {
+    const accessToken = req.headers.authorization?.split(" ")[1];
 
-            const userData = await userModel.findById(decodedToken.id);
+    if (!accessToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Token not found",
+      });
+    }
 
-            if (!userData) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User Not Found'
-                });
-            }
+    const decodedToken = jwt.verify(accessToken, config.JWT_ACCESS_TOKEN);
 
-            return res.status(200).json({
-                success: true,
-                message: 'User Fetched Seccessfully',
-                data: {
-                    username: userData.username,
-                    email: userData.email
-                }
-            });
-        } catch (error) {
-            return res.status(401).json({
-                success: false,
-                message: 'Internal Server Error',
-                error: error.message
-            });
-        }
-    };
+    const userData = await userModel.findById(decodedToken.id);
 
-    // Access Token is Short Lived Token
-    // Refresh Token is Long Lived Token
+    if (!userData) {
+      return res.status(404).json({
+        success: false,
+        message: "User Not Found",
+      });
+    }
 
-    // Get Access Token
+    return res.status(200).json({
+      success: true,
+      message: "User Fetched Seccessfully",
+      data: {
+        username: userData.username,
+        email: userData.email,
+      },
+    });
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+}
 
-    export async function refreshAccessToken(req, res) {
-        try{
-            const incomingRefreshToken = req.cookies.refreshToken;
+// Access Token is Short Lived Token
+// Refresh Token is Long Lived Token
 
-            if (!incomingRefreshToken) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Token not found'
-                });
-            };
+// Get Access Token
 
-            const decodedToken = jwt.verify(incomingRefreshToken, config.JWT_REFRESH_TOKEN);
-            const userData = await userModel.findById(decodedToken.id);
+export async function refreshAccessToken(req, res) {
+  try {
+    const incomingRefreshToken = req.cookies.refreshToken;
 
-            if (!userData) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User Not Found'
-                });
-            };
+    if (!incomingRefreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Token not found",
+      });
+    }
 
-            const accessToken = jwt.sign({
-                id: decodedToken.id
-            }, config.JWT_ACCESS_TOKEN,{
-                expiresIn: "15m"
-            });
+    const decodedToken = jwt.verify(
+      incomingRefreshToken,
+      config.JWT_REFRESH_TOKEN,
+    );
+    const userData = await userModel.findById(decodedToken.id);
 
-            return res.status(200).json({
-                success: true,
-                message: 'Access Token Generated',
-                accessToken: accessToken
-            });
-        } catch(error) {
-            return res.status(401).json({
-                success: false,
-                message: 'Internal Server Error',
-                error: error.message
-            });
-        };
-};
+    if (!userData) {
+      return res.status(404).json({
+        success: false,
+        message: "User Not Found",
+      });
+    }
+
+    const accessToken = jwt.sign(
+      {
+        id: decodedToken.id,
+      },
+      config.JWT_ACCESS_TOKEN,
+      {
+        expiresIn: "15m",
+      },
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Access Token Generated",
+      accessToken: accessToken,
+    });
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+}
