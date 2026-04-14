@@ -57,27 +57,42 @@ export async function register(req, res){
 // Get Me
 
 export async function getMe(req, res) {
-    const accessToken = req.headers.authorization?.split(" ")[ 1 ];
+    try{
+        const accessToken = req.headers.authorization?.split(" ")[ 1 ];
 
-    if (!accessToken) {
+        if (!accessToken) {
+            return res.status(401).json({
+                success: false,
+                message: 'Token not found'
+            });
+        };
+
+        const decodedToken = jwt.verify(accessToken, config.JWT_ACCESS_TOKEN);
+
+        const userData = await userModel.findById(decodedToken.id);
+
+        if (!userData) {
+            return res.status(404).json({
+                success: false,
+                message: 'User Not Found'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'User Fetched Seccessfully',
+            data: {
+                username: userData.username,
+                email: userData.email
+            }
+        });
+    } catch (error) {
         return res.status(401).json({
             success: false,
-            message: 'Token not found'
+            message: 'Internal Server Error',
+            error: error.message
         });
-    };
-
-    const decodedToken = jwt.verify(accessToken, config.JWT_ACCESS_TOKEN);
-
-    const userData = await userModel.findById(decodedToken.id);
-
-    return res.status(200).json({
-        success: true,
-        message: 'User Fetched Seccessfully',
-        data: {
-            username: userData.username,
-            email: userData.email
-        }
-    });
+    }
 };
 
 // Access Token is Short Lived Token
@@ -118,7 +133,7 @@ export async function refreshAccessToken(req, res) {
             accessToken: accessToken
         });
     } catch(error) {
-        return res.status(400).json({
+        return res.status(401).json({
             success: false,
             message: 'Internal Server Error',
             error: error.message
